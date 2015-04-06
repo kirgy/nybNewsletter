@@ -10,7 +10,7 @@
 */
 
 
-class nybnewlstter {
+class nybNewletter {
 
 	public function __construct() {
 		$this->aSettings = array(
@@ -18,6 +18,7 @@ class nybnewlstter {
 				'prefix'	=> 'nybNewletter_'
 			),
 		);
+		$this->aError = array();
 	}
 
 	public function __destruct() {
@@ -49,21 +50,23 @@ class nybnewlstter {
 
 	  $sPrefix = $this->aSettings['table']['prefix'];
 
-	  $sql = "CREATE TABLE nybNewsletter (
-		{$sPrefix}_id mediumint(9) NOT NULL AUTO_INCREMENT,
-		{$sPrefix}_firstName varchar(32),
-		{$sPrefix}_lastName varchar(32),
-		{$sPrefix}_email  varchar(255) NOT NULL,
-		{$sPrefix}_IP varchar(255) NOT NULL,
-		{$sPrefix}_subscribed bool NOT NULL,
-		{$sPrefix}_unsubDate datetime NOT NULL,
-		{$sPrefix}_created datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
-		{$sPrefix}_updated timestamp NOT NULL ON UPDATE CURRENT_TIMESTAMP,
-		UNIQUE KEY {$sPrefix}_id ({$sPrefix}_id)
+	  $sql = "CREATE TABLE {$wpdb->prefix}nybNewsletter (
+		{$sPrefix}id mediumint(9) NOT NULL AUTO_INCREMENT,
+		{$sPrefix}firstName varchar(32),
+		{$sPrefix}lastName varchar(32),
+		{$sPrefix}email  varchar(255) NOT NULL,
+		{$sPrefix}IP varchar(255) NOT NULL,
+		{$sPrefix}subscribed bool NOT NULL,
+		{$sPrefix}unsubDate datetime NOT NULL,
+		{$sPrefix}created datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+		{$sPrefix}updated timestamp NOT NULL ON UPDATE CURRENT_TIMESTAMP,
+		PRIMARY KEY {$sPrefix}id ({$sPrefix}id),
+		UNIQUE KEY {$sPrefix}email ({$sPrefix}email)
 	  ) $charset_collate;";
 
 	  require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
 	  dbDelta( $sql );		
+	  $this->log('Plugin activated');
 		
 	}
 
@@ -89,6 +92,11 @@ class nybnewlstter {
 
 	}
 
+	/**
+	*	Performs a CRUD action on the database table.
+	*
+	*	@return Bool
+	*/
 	public function crud($sAction) {
 
 		switch ($sAction) {
@@ -99,18 +107,30 @@ class nybnewlstter {
 					2) insert with sprint_f
 					3) return true/false
 				*/
-				$sPrefix = $this->aSettings['table']['prefix']
-				global $wpdb;
-				$wpdb->insert( $sTable, array(
-					$sPrefix . 'firstName'		=> $_POST[$sPrefix . 'firstName'],
-					$sPrefix . 'lastName'		=> $_POST[$sPrefix . 'lastName'],
-					$sPrefix . 'email'			=> $_POST[$sPrefix . 'email'],
-					$sPrefix . 'IP'				=> $_SERVER['REMOTE_ADDR'],
-					$sPrefix . 'subscribed'		=> 1,
-					$sPrefix . 'unsubDate'		=> null,
-					$sPrefix . 'created'		=> date("Y-m-d H:i:s"),
-					$sPrefix . 'updated'		=> date("Y-m-d H:i:s"),
-				));
+				$sPrefix 	= $this->aSettings['table']['prefix'];
+				if(isset($_POST[$sPrefix . 'firstName']) && isset($_POST[$sPrefix . 'lastName']) && isset($_POST[$sPrefix . 'email'])) {
+					if( strlen($_POST[$sPrefix . 'firstName'])<1 || strlen($_POST[$sPrefix . 'lastName'])<1 || ((bool) (is_email($_POST[$sPrefix . 'email'])))==false ) {
+						$this->aError[] = 'Please complete all fields';
+						$this->log('Not all fields were set.');
+					} else {
+						$this->log('Processing CREATE.');
+						global $wpdb;
+						$sTable		= $wpdb->prefix . 'nybNewsletter';
+						$wpdb->insert( $sTable, array(
+							$sPrefix . 'firstName'		=> $_POST[$sPrefix . 'firstName'],
+							$sPrefix . 'lastName'		=> $_POST[$sPrefix . 'lastName'],
+							$sPrefix . 'email'			=> $_POST[$sPrefix . 'email'],
+							$sPrefix . 'IP'				=> $_SERVER['REMOTE_ADDR'],
+							$sPrefix . 'subscribed'		=> 1,
+							$sPrefix . 'unsubDate'		=> null,
+							$sPrefix . 'created'		=> date("Y-m-d H:i:s"),
+							$sPrefix . 'updated'		=> date("Y-m-d H:i:s"),
+						));
+					}
+				} else {
+					$this->aError[] = 'Please complete all required fields.';
+					$this->log('The required fields for creating a new table entry were not met.');
+				}
 
 				break;
 			
@@ -125,18 +145,32 @@ class nybnewlstter {
 	*
 	*	returns String
 	*/
-	public static function getform() {
+	public function getform() {
+		$sErrors = '';
+		if(count($this->aError) > 0) {
+			foreach ($this->aError as $sError) {
+				$sErrors .= '<p>' . $sError . '</p>';
+			}
 
-		$sForm = '	<div class="subscribe-form-wrap">
-						<form action="/" method="post" onclick="return false;">
+			$sErrors = '<div class="nybnewsletter-errors">' . $sErrors . '</div>';
+		}
+
+		$sForm = '	<div class="subscribe-form-wrap" id="nybNewletter-form">
+						' . $sErrors . '
+						<form action="#nybNewletter-form" name="nybNewslettersubscribeform" id="nybNewslettersubscribeform" method="post" onclick="//return false;" target="nybnewsletter_iframe">
 						<div class="email-input-wrap">
-							<input type="text" name="subscribeEmail" maxlength="255">
+							<input type="hidden" name="nybnewletter" maxlength="255">
+							<input type="text" name="nybNewletter_email" id="nybNewletter_email" maxlength="255">
+							<input type="hidden" name="nybNewletter_lastName" id="nybNewletter_lastName" maxlength="255">
+							<input type="hidden" name="nybNewletter_firstName" id="nybNewletter_firstName" maxlength="255">
 						</div><!--
 					!--><div class="cta-input-wrap">
-							<input type="submit" class="primary-form-cta subscribe-email-click" value="subscribe">
+							<button class="primary-form-cta ajax-block" id="nybnewsletter-submit" value="subscribe" dataset="nybnewsletter: :" />Subscribe</button>
+							<input type="submit" class="primary-form-cta subscribe-email-click hide-field" value="subscribe">
 							<input type="text" name="email_x" class="noshow">
+							</form>
+							<iframe src="" name="nybnewsletter_iframe" id="nybnewsletter_iframe" style="display: none;"></iframe>
 						</div>
-						</form>
 					</div>';
 
 		return $sForm;
@@ -146,12 +180,17 @@ class nybnewlstter {
 	/**
 	*	Returns the shortcode data used by the Wordpress function
 	*
-	*	@return String
+	*	@return void
 	*/
 
-	public static function doShortcode() {
+	public function doShortcode() {
 		// wrapper fuction for getForm()
-		return self::getForm();
+		echo $this->getForm();
+		return null;
+	}
+
+	public function log($sLog) {
+		error_log(':: [NybNewletter] ::: ' . $sLog);
 	}
 
 }

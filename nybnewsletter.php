@@ -20,6 +20,11 @@
  *
  */
 
+require_once('nybnewsletter.class.php');
+if(isset($_POST['nybnewletter']) /*&& $bIsFromServer*/ ) {  //@TODO: set bIsFromServer
+	$nybnews = nybnewsletter_create_nybnewsletter();
+	$nybnews->process_form();
+}
 
 //add_action("wp_head", "nybnewsletter_writetoscreen");
 add_action( 'admin_menu', 'nybnewsletter_menu' );
@@ -33,6 +38,7 @@ add_shortcode( 'nybnewsletter', 'nybNewsletter_get_template_html' );
 //wp_enqueue_style( 'nybnewsletterSettingsStylesheet');
 register_activation_hook( __FILE__, 'nybnewsletter_activate' );
 register_deactivation_hook( __FILE__, 'nybnewsletter_deactivate' );
+
 
 function create_nybnewsletter(){
 
@@ -53,7 +59,7 @@ function nybnewsletter_activate(){
 		wp_die( __( 'You do not have sufficient permissions to access this page.' ) );
 	} else {   
 		$nybnews = nybnewsletter_create_nybnewsletter();
-		$nybnews->activate;
+		$nybnews->activate();
    }
 }
 
@@ -69,12 +75,11 @@ function nybnewsletter_deactivate() {
 
 function nybNewsletter_get_template_html() {
 	$nybnews = nybnewsletter_create_nybnewsletter();
-	return $nybnews->doShortcode();
+	echo $nybnews->doShortcode();
 }
 
 function nybnewsletter_create_nybnewsletter() {
-	require_once 'nybnewsletter.class.php';
-	$nybnews = new nybnewsletter;
+	$nybnews = new nybNewletter;
 
 	return $nybnews;
 }
